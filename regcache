@@ -1,0 +1,274 @@
+#!/usr/bin/python3
+'''
+Author : Zachary Harvey
+Date : 2/24/2015
+Brief :
+    This will read and write regexs out from a config file and print them out
+    to the command line.
+
+'''
+
+import re
+import json
+from os.path import sep, expandvars, isfile, exists
+from sys import argv, stderr
+import argparse
+
+DIR=expandvars('.')
+CONF='regex_cache.conf'
+FULL_CONF=DIR+sep+CONF
+EXAMPLE_CONF='''
+{"ipv4" :
+    {"regex" : "(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)",
+     "detail" : "This will properly match a full IPv4 address"},
+ "mac" :
+    {"regex" : "([0-9a-f]{1,2}[\\\\.:-]){5}([0-9a-f]{1,2})",
+     "detail" : "This will match a well formed MAC address with either a . : or - as the seperator."}
+}'''
+
+class RegCache:
+    def __init__(self, jsonFile):
+        self.cachePath = ''
+        try:
+            self.LoadCache(jsonFile)
+        except ValueError:
+            self.cache = EXAMPLE_CONF
+            if isfile(jsonFile):
+                self.cachePath = jsonFile
+
+    def LoadCache(self, newCache=None):
+        '''
+        Brief:
+            This will load in the JSON database and set the cache.
+
+        Parameters:
+            newCache : str or None
+                A file path to load in a cache from. If newCache is None then
+                it'll load self.cachePath
+
+        Exceptions:
+            ValueError : When newCache is not an existing file.
+        '''
+        if None == newCache:
+            self.LoadCache(self.cachePath)
+        elif newCache and isfile(newCache):
+            self.cache = json.load(open(newCache))
+            self.cachePath = newCache
+        else:
+            raise ValueError('The new cache must be a JSON data file.')
+
+    def WriteOutCache(self):
+        '''
+            Brief:
+                This will write out a cache to a file path gotten from self.cachePath
+        '''
+        json.dump(self.cache, open(self.cachePath, 'w'))
+
+    def AddRegex(self, title, regex, detail=''):
+        '''
+        Brief:
+            This will add the regex to the database.
+
+        Parameters:
+            title : str
+                The title for the regex.
+
+            regex : str (as a valid regex)
+                The regex to add.
+
+            detail : str
+                A detialed description of the regex, though this is not
+                needed. It will only be displayed when asked for.
+
+        Exception:
+            ValueError : If the title is already in the cache.
+        '''
+        if title in self.cache.keys():
+            raise ValueError('The title provided is already in the database.')
+        self.cache.update({title: {"regex":regex, "detail":detail}})
+
+    def RemoveRegex(self, title):
+        '''
+        Brief:
+            This will remove the regex from the cache.
+
+        Parameters:
+            title : str
+                The regex to remove.
+        '''
+        try:
+            del self.cache[title]
+        except KeyError:
+            pass
+
+    def PrintAll(self, detail=True):
+        '''
+            Brief:
+                Will print out all the regexs in the database.
+        '''
+        PrintRegs(detail=detail)
+
+    def PrintRegs(self, detail=True):
+        '''
+            Brief:
+                This will print out a single regex from the database.
+
+            Parameters:
+                detail : bool
+                    If this is true then it will also print out the detailed description
+                    for the regex.
+        '''
+        for k, v in self.cache.items():
+            print(k, '\n\t', v['regex'])
+            if detail:
+                print('\t','\n\t'.join(v['detail'].splitlines()))
+
+    def GetJson(self):
+        return json.dumps(self.cache)
+
+    def _GetCachePath(self):
+        '''
+        Brief:
+            Holding the file path to the loaded cache.
+        '''
+        return self.__cachePath
+
+    def _SetCachePath(self, newCachePath):
+        self.__cachePath = newCachePath
+    cachePath = property(_GetCachePath, _SetCachePath)
+
+    def _GetCache(self):
+        '''
+        Brief:
+            The loaded regex cache.
+        '''
+        return self.__cache
+
+    def _SetCache(self, newCache):
+        if isinstance(newCache, str):
+            self.__cache = json.loads(newCache)
+        elif isinstance(newCache, dict):
+            self.__cache = newCache
+        else:
+            TypeError('cache must be either a dict or a JSON compatible string.')
+    cache = property(_GetCache, _SetCache)
+
+    def __getitem__(self, key):
+        return self.cache[key]
+
+    def keys(self):
+        return self.cache.keys()
+
+#The CLI program that'll drive everything.
+def PrintAll(cache, detail=True):
+    '''
+        Brief:
+            Will print out all the regexs in the database.
+    '''
+    PrintRegs(cache, detail=detail)
+    return 0
+
+def PrintRegs(cache, regsTitles, detail=True):
+    '''
+        Brief:
+            This will print out a single regex from the database.
+
+        Parameters:
+            detail : bool
+                If this is true then it will also print out the detailed description
+                for the regex.
+    '''
+    for t in regsTitles:
+        print(t, '\n\t', cache[t]['regex'])
+        if detail:
+            print('\t','\n\t'.join(cache[t]['detail'].splitlines()))
+    return 0
+
+def CLIRegCache(args):
+    '''
+        Brief:
+            The main entry of the program.
+
+        Parameters:
+            args : argparse.Namespace
+                The return value from argparse.ArgumentParser().parse_args()
+    '''
+    writeOut = False
+    cache = RegCache(args.cache)
+    if args.detail or args.title:
+        if args.REGEX:
+            PrintRegs(cache, args.REGEX.split(','), args.detail)
+        else:
+            PrintAll(cache, args.detail)
+    elif args.rem and args.REGEX:
+        cache.RemoveRegex(args.REGEX)
+        writeOut = True
+    elif args.REGEX:
+        try:
+            print(cache[args.REGEX]['regex'])
+        except KeyError:
+            print('ERROR : Regex '+args.REGEX+' is not in the cache.')
+            return 1
+    elif args.json:
+        print(cache.GetJson())
+    elif args.add:
+        name = input('Please input the regex name: ')
+        if name in cache.keys():
+            print('ERROR : Name is already in the cache.')
+            exit(1)
+        regex = input('Please input the regex: \n')
+        details = input('Please input the detail description: \n')
+        try:
+            cache.AddRegex(name, regex, details)
+        except ValueError:
+            print('ERROR : Regex is already in the cache.')
+            return 1
+        writeOut = True
+    else:
+        print("I don't understant what you're trying to say, also this should break your shell `'\";[{", file=stderr)
+        return 1
+    if writeOut:
+        try:
+            cache.WriteOutCache()
+        except OSError as e:
+            print('ERROR : Could not write out the cache. ', end='\n')
+            print(e.args[1])
+            return e.args[0]
+    return 0
+
+def SetupArgs():
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument('-d', '--detail',
+                        action='store_true',
+                        default=False,
+                        help='This will print all information known about a regular expression.')
+    parser.add_argument('-t', '--title',
+                        action='store_true',
+                        default=False,
+                        help='Print regular expressions with titles only.')
+    parser.add_argument('-c', '--cache',
+                        type=str, default=FULL_CONF,
+                        help='Force differnet regular expression cache.')
+    parser.add_argument('-j', '--json',
+                        action='store_true',
+                        default=False,
+                        help='Print out the json cached file.')
+    parser.add_argument('-a','--add',
+                        action='store_true',
+                        default=False,
+                        help='Add a new regex to the cache.')
+    parser.add_argument('--rem',
+                        action='store_true',
+                        default=False,
+                        help='This will remove the provided regex from the cache.')
+    parser.add_argument('--init',
+                        action='store_true',
+                        default=False,
+                        help='This will initalize a new cache on the path of FULL_CONF.')
+    parser.add_argument('REGEX', help='The regex to operate on.',
+                        type=str, default='', nargs='?')
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    exit(CLIRegCache(SetupArgs()))
