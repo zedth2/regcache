@@ -8,6 +8,16 @@ $ ip addr | grep -P `regcache mac`
     link/ether fa:ee:67:89:09:43 brd ff:ff:ff:ff:ff:ff
     link/ether d4:b2:11:89:75:e4 brd ff:ff:ff:ff:ff:ff
 ```
+Adding a regex goes a little bit something like this...
+```
+./regcache -a                                                                                                                                                                                                    [ 02/24/16  8:32PM ]
+Please input the regex name: devs
+Please input the regex:
+sd[a-z][0-9]
+Please input the detail description:
+This should find drives in /dev
+```
+
 # deps
  - Python 3
 
