@@ -10,7 +10,7 @@ $ ip addr | grep -P `regcache mac`
 ```
 Adding a regex goes a little bit something like this...
 ```
-./regcache -a                                                                                                                                                                                                    [ 02/24/16  8:32PM ]
+./regcache -a
 Please input the regex name: devs
 Please input the regex:
 sd[a-z][0-9]
