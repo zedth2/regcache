@@ -12,7 +12,8 @@ $ ip addr | grep -P `regcache mac`
 # Install
 Copy the regcache file to anywhere that's inside your PATH variable and edit the value of FULL_CONF
 to the regex cache you want to have loaded. FULL_CONF has to be a text file that is a valid JSON string.
-
+    # deps
+        Python 3
 # HELP!!!
 ```
 usage: regcache [-h] [-d] [-t] [-c CACHE] [-j] [-a] [--rem] [--init] [REGEX]
